@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <queue>
 #include <algorithm>
 
 using namespace std;
@@ -11,29 +12,45 @@ static void print_nodes (vector<Node *> &);
 struct Node {
 private:
 	int val;
+	int ttl;
+	bool visited;
 	vector<Node *> adjacent_nodes;
-	void reachable_nodes (int ttl, vector<Node *> &working_vector);
 public:
 	Node (int val) { this->val = val; }
 	void add_adjacent_node (Node *node) { adjacent_nodes.push_back (node); }
-	vector<Node *> *create_reachable_nodes (int ttl);
+	int reachable_nodes (int ttl);
 	string description (void) { return to_string (this->val); }
+	static void clear_nodes (vector<Node *> &nodes) {
+		for (Node *node : nodes) {
+			node->ttl = 0;
+			node->visited = false;
+		}
+	}
 };
 
-void
-Node::reachable_nodes (int ttl, vector<Node *> &working_vector) {
-	if (find (working_vector.begin (), working_vector.end (), this) == working_vector.end ())
-		working_vector.push_back (this);
+int
+Node::reachable_nodes (int ttl) {
+	int result = 0;
 	
-	if (ttl-- > 0)
-		for (Node *node : this->adjacent_nodes)
-			node->reachable_nodes (ttl, working_vector);
-}
+	queue<Node *> q;
+	this->ttl = ttl;
+	this->visited = true;
+	q.push (this);
 
-vector<Node *> *
-Node::create_reachable_nodes (int ttl) {
-	vector<Node *> *result = new vector<Node *> ();
-	this->reachable_nodes (ttl, *result);
+	while (!q.empty ()) {
+		Node *node = q.front (); q.pop ();
+
+		++result;
+	
+		if (node->ttl > 0)
+			for (Node *other_node : node->adjacent_nodes) {
+				if (!other_node->visited) {
+					other_node->visited = true;
+					other_node->ttl = node->ttl - 1;
+					q.push (other_node);
+				}
+			}
+	}
 	return result;
 }
 
@@ -58,11 +75,11 @@ create_map (istream &r) {
 
 			Node *right_node; Node *left_node;
 			left_node = (*result)[left_val];
-			right_node = (*result)[right_val];
-
 			if (!left_node) {
 				left_node = new Node (left_val);
 				(*result)[left_val] = left_node;}
+
+			right_node = (*result)[right_val];
 			if (!right_node) {
 				right_node = new Node (right_val);
 				(*result)[right_val] = right_node;}
@@ -86,11 +103,15 @@ read_case (istream &r) {
 	return make_pair (start_node_num, ttl);
 }
 
-static vector<Node *> *
+int
 solve (int start_node_num, int ttl, unordered_map<int,Node *> &map) {
 	Node *start_node = map[start_node_num];
-	vector<Node *> *result = start_node->create_reachable_nodes (ttl);
-	return result;
+	vector<Node *> nodes;
+	for (pair<int,Node *>p : map) {
+		nodes.push_back (p.second);
+	}
+	Node::clear_nodes (nodes);
+	return map.size() - start_node->reachable_nodes (ttl);
 }
 
 static void
@@ -108,12 +129,11 @@ main (void) {
 		while (true) {
 			pair<int, int> next_case = read_case (cin);
 			if (next_case == make_pair(0,0)) break;
-			vector<Node *> *result_nodes = solve (next_case.first, next_case.second, *map);
-			int nodes_not_reachable = map->size () - result_nodes->size ();
-			print_results (++case_num, nodes_not_reachable, next_case.first, next_case.second);
-			delete result_nodes;
+			int result = solve (next_case.first, next_case.second, *map);
+			print_results (++case_num, result, next_case.first, next_case.second);
 		}
-
+		for (pair<int, Node *> p: *map)
+			delete p.second;
 		delete map;
 	}
 }
